@@ -1,3 +1,28 @@
+# Environment and secrets
 .env
-__pycache__
-tests
+.env.*
+secret.py
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+
+# Pytest caches
+.pytest_cache/
+
+# Packaging
+build/
+dist/
+*.egg-info/
+
+# IDEs and Editor files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store

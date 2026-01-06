@@ -3,12 +3,11 @@ import requests
 import pandas as pd
 from datetime import datetime
 
-# Configuration
+# --- CONFIGURATION ---
 API_URL = "http://127.0.0.1:8000"
-
 st.set_page_config(page_title="Secure HIS Dashboard", page_icon="🏥", layout="wide")
 
-# Session State Initialization
+# --- SESSION STATE INITIALIZATION ---
 if "token" not in st.session_state:
     st.session_state.token = None
 if "role" not in st.session_state:
@@ -28,17 +27,28 @@ with st.sidebar:
         
         if st.button("Authenticate"):
             try:
-                response = requests.post(f"{API_URL}/auth/login", json={"username": u_input, "password": p_input})
+                response = requests.post(f"{API_URL}/auth/login", json={"username": u_input.strip(), "password": p_input}, timeout=5)
                 if response.status_code == 200:
                     data = response.json()
                     st.session_state.token = data["access_token"]
-                    st.session_state.username = u_input
+                    st.session_state.username = u_input.strip()
                     st.session_state.role = "Admin" if "admin" in u_input.lower() else "Doctor"
                     st.rerun()
                 else:
                     st.error("Invalid Credentials")
-            except:
-                st.error("Backend Offline")
+            except Exception as e:
+                st.error(f"Backend Offline: {e}")
+
+        # Quick connectivity check for debugging
+        if st.button("Check Backend"):
+            try:
+                r = requests.get(f"{API_URL}/openapi.json", timeout=3)
+                if r.status_code == 200:
+                    st.success("Backend reachable: openapi.json OK")
+                else:
+                    st.error(f"Backend responded with status {r.status_code}")
+            except Exception as e:
+                st.error(f"Backend Offline: {e}")
     else:
         st.success(f"Verified: {st.session_state.username}")
         st.info(f"Role: {st.session_state.role}")
@@ -55,7 +65,7 @@ if not st.session_state.token:
 else:
     headers = {"Authorization": f"Bearer {st.session_state.token}"}
 
-    # 🩺 DOCTOR DASHBOARD
+    # --- DOCTOR DASHBOARD ---
     if st.session_state.role == "Doctor":
         st.markdown(f'<div class="header-box"><h1>🩺 Clinical Decision Support</h1><p>User: {st.session_state.username} | Status: Authorized</p></div>', unsafe_allow_html=True)
         
@@ -71,12 +81,16 @@ else:
             with col1:
                 p_id = st.number_input("Patient ID", min_value=1, step=1)
                 if st.button("🔍 Search Record"):
-                    res = requests.get(f"{API_URL}/patients/{p_id}", headers=headers)
-                    if res.status_code == 200:
-                        st.session_state.p_data = res.json()
-                    else:
-                        st.error("Access Denied.")
-
+                    try:
+                        res = requests.get(f"{API_URL}/patients/{p_id}", headers=headers, timeout=5)
+                        if res.status_code == 200:
+                            st.session_state.p_data = res.json()
+                        elif res.status_code == 403:
+                            st.error("Access Denied.")
+                        else:
+                            st.error(f"Request failed: {res.status_code} - {res.text}")
+                    except Exception as e:
+                        st.error(f"Backend Offline: {e}")
             with col2:
                 if "p_data" in st.session_state:
                     st.success(f"Displaying Record for ID: {st.session_state.p_data['id']}")
@@ -89,11 +103,17 @@ else:
             reason = st.text_area("Justification (Required for Audit Trail)")
             if st.button("Activate Emergency Access"):
                 if reason:
-                    res = requests.post(f"{API_URL}/patients/{em_id}/break-glass?reason={reason}", headers=headers)
-                    st.warning("Override Successful. Record Logged.")
-                    st.json(res.json())
+                    try:
+                        res = requests.post(f"{API_URL}/patients/{em_id}/break-glass", params={"reason": reason}, headers=headers, timeout=5)
+                        if res.status_code == 200:
+                            st.warning("Override Successful. Record Logged.")
+                            st.json(res.json())
+                        else:
+                            st.error(f"Request failed: {res.status_code} - {res.text}")
+                    except Exception as e:
+                        st.error(f"Backend Offline: {e}")
 
-    # ⚙️ ADMIN DASHBOARD
+    # --- ADMIN DASHBOARD ---
     elif st.session_state.role == "Admin":
         st.markdown(f'<div class="header-box"><h1>⚙️ System Administration</h1><p>User: {st.session_state.username} | Role: Integrity Officer</p></div>', unsafe_allow_html=True)
         
@@ -103,21 +123,62 @@ else:
         a3.metric("Database", "PostgreSQL")
 
         tab1, tab2, tab3 = st.tabs(["🛡️ Audit Logs", "👥 User Management", "🖥️ Network Health"])
-        
+
+        # --- AUDIT LOGS ---
         with tab1:
             st.subheader("Integrity Verification")
             if st.button("🔄 Pull Security Logs"):
-                res = requests.get(f"{API_URL}/admin/audit-logs", headers=headers)
-                if res.status_code == 200:
-                    st.table(pd.DataFrame(res.json()))
+                try:
+                    res = requests.get(f"{API_URL}/admin/audit-logs", headers=headers, timeout=5)
+                    if res.status_code == 200:
+                        st.table(pd.DataFrame(res.json()))
+                    else:
+                        st.error(f"Request failed: {res.status_code} - {res.text}")
+                except Exception as e:
+                    st.error(f"Backend Offline: {e}")
 
+        # --- USER MANAGEMENT ---
         with tab2:
             st.subheader("Account Provisioning")
+
+            # Fetch roles dynamically
+            try:
+                role_res = requests.get(f"{API_URL}/admin/roles", headers=headers, timeout=5)
+                if role_res.status_code == 200:
+                    roles_list = [r["role_name"] for r in role_res.json()]
+                elif role_res.status_code == 403:
+                    st.warning("Not authorized to fetch roles; using default list.")
+                    roles_list = ["Doctor", "Nurse", "Admin"]
+                else:
+                    st.error(f"Failed to fetch roles: {role_res.status_code}")
+                    roles_list = ["Doctor", "Nurse", "Admin"]
+            except Exception as e:
+                st.error(f"Backend Offline while fetching roles: {e}")
+                roles_list = ["Doctor", "Nurse", "Admin"]
+
             c1, c2 = st.columns(2)
             with c1:
                 new_u = st.text_input("New Username")
                 new_p = st.text_input("Initial Password", type="password")
             with c2:
-                new_r = st.selectbox("Assign Role", ["Doctor", "Nurse", "Admin"])
+                new_r = st.selectbox("Assign Role", roles_list)
+
             if st.button("Create Staff Account"):
-                st.success(f"Account '{new_u}' successfully provisioned with role '{new_r}'.")
+                if not new_u or not new_p or not new_r:
+                    st.error("Please fill in all fields before creating the account.")
+                else:
+                    payload = {"username": new_u.strip(), "password": new_p, "role_name": new_r}
+                    try:
+                        res = requests.post(f"{API_URL}/admin/register-user", json=payload, headers=headers, timeout=5)
+                        if res.status_code == 200:
+                            st.success(f"Account '{new_u}' successfully provisioned with role '{new_r}'.")
+                            new_u, new_p = "", ""
+                        else:
+                            st.error(f"Failed to create account: {res.json().get('detail', res.text)}")
+                    except Exception as e:
+                        st.error(f"Backend Offline: {e}")
+
+        # --- NETWORK HEALTH ---
+        with tab3:
+            st.subheader("Network & System Health")
+            st.info("Monitoring tools coming soon...")

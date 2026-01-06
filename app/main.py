@@ -4,8 +4,11 @@ from app.database import engine, Base
 from app.api import auth, patients, admin  # Ensure admin is imported here
 
 # 1. Initialize the Database (Integrity Pillar)
-# This creates all tables in Supabase (Users, Patients, Audit Logs) automatically.
-Base.metadata.create_all(bind=engine)
+# In test environments or when SKIP_DB_CREATE is set, skip creating tables to avoid contacting external DBs.
+import os
+if os.getenv("SKIP_DB_CREATE", "false").lower() != "true":
+    # This creates all tables in Supabase (Users, Patients, Audit Logs) automatically.
+    Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Secure Hospital Information System",
