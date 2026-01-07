@@ -1,6 +1,14 @@
-# Secure HIS — Project Reference
+# Secure HIS — Secure Hospital Information System (Reference Implementation)
 
-A small FastAPI-based Hospital Information System (HIS) focused on Confidentiality, Integrity, and Availability.
+Secure HIS is a compact, opinionated reference implementation of a Hospital Information System (HIS) built with FastAPI. It demonstrates practical, security-focused patterns and best practices useful for learning or as a starter template, including secure authentication, password reset flows, audit logging, and role-based access control. This project is intended for demonstration and development purposes — it is not a production-ready clinical system.
+
+**Key features:**
+- Authentication with JWT-based sessions and secure password hashing
+- Password reset with hashed, single-use tokens
+- Role-Based Access Control (RBAC) and admin endpoints
+- Audit logging for security-sensitive events
+- Tests and pre-commit secret scanning included
+- Alembic migrations and DB seed scripts for easy setup
 
 ## Quick links
 - API: `app/main.py`
@@ -9,6 +17,7 @@ A small FastAPI-based Hospital Information System (HIS) focused on Confidentiali
 - Tests: `tests/`
 - Streamlit UI: `app.py`
 - DB: PostgreSQL (Supabase by default)
+- Docs: `docs/REFERENCE.md`
 
 ---
 
@@ -20,6 +29,28 @@ A small FastAPI-based Hospital Information System (HIS) focused on Confidentiali
 - Run tests: `python -m pytest -q`
 - Seed data: `python seed_users.py` / `python seed_patients.py`
 - Admin reset CLI: `python scripts/admin_reset_user.py --username <user> --password <temp>`
+
+## Getting started
+Follow these minimal steps to run the project locally:
+
+1. Copy and configure environment variables:
+   - `cp .env.example .env` and edit `.env` (do **not** commit `.env`).
+2. Install dependencies:
+   - `python -m pip install -r requirements.txt`
+   - (optional) `python -m pip install -r requirements-dev.txt` for development tools and tests
+3. Prepare the database:
+   - Use a local PostgreSQL instance or Supabase; run Alembic migrations: `alembic upgrade head`
+   - For quick development only: the app may call `Base.metadata.create_all()` when enabled
+4. Seed example data (optional):
+   - `python seed_users.py` and `python seed_patients.py`
+5. Run the API (development):
+   - `uvicorn app.main:app --reload`
+6. Run the Streamlit UI (optional):
+   - `streamlit run app.py`
+7. Run tests:
+   - `python -m pytest -q`
+
+> Tip: For tests and CI you can set `SKIP_DB_CREATE=true` to skip automatic `create_all` during import.
 
 ---
 
@@ -69,5 +100,3 @@ A small FastAPI-based Hospital Information System (HIS) focused on Confidentiali
 - Install pre-commit: `pre-commit install` and run `pre-commit run --all-files`.
 
 ---
-
-If you want I can add more details (diagrams, flowcharts, or API docs) or move this into `docs/REFERENCE.md` instead.
